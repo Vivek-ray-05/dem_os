@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   Cpu, 
@@ -11,10 +11,24 @@ import {
   Pause, 
   RotateCcw 
 } from 'lucide-react';
+import { useSimulation } from '../store/useSimulation';
 
 export default function OSVisualizer() {
-  // Logic to switch between textbook modules
   const [activeTab, setActiveTab] = useState('cpu');
+  
+  // Connect to the Simulation Store
+  const { isPlaying, togglePlay, tick, speed, resetSimulation } = useSimulation();
+
+  // --- THE KERNEL HEARTBEAT ---
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPlaying) {
+      interval = setInterval(() => {
+        useSimulation.getState().advanceTick();
+      }, 1000 / speed);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, speed]);
 
   const menuItems = [
     { id: 'cpu', icon: <Cpu size={18} />, label: 'CPU Scheduling' },
@@ -41,22 +55,20 @@ export default function OSVisualizer() {
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
                 activeTab === item.id 
                 ? 'bg-primary/10 text-primary border border-primary/20' 
-                : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+                : 'text-slate-400 hover:bg-white/5'
               }`}
             >
-              <span className={activeTab === item.id ? 'text-primary' : 'text-slate-500 group-hover:text-slate-300'}>
-                {item.icon}
-              </span>
+              {item.icon}
               <span className="text-sm font-medium">{item.label}</span>
             </button>
           ))}
         </nav>
 
         <div className="p-4 border-t border-white/5">
-          <button className="flex items-center gap-3 px-4 py-2 text-slate-500 hover:text-white transition-colors w-full">
+          <button className="flex items-center gap-3 px-4 py-2 text-slate-500 hover:text-white transition-colors w-full text-left">
             <Settings size={16} />
             <span className="text-xs">System Settings</span>
           </button>
@@ -66,7 +78,6 @@ export default function OSVisualizer() {
       {/* --- MAIN CONTENT --- */}
       <main className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-transparent to-primary/5">
         
-        {/* Top Header / Control Bar */}
         <header className="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-surface/30 backdrop-blur-md">
           <div className="flex items-center gap-4">
             <h2 className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
@@ -75,19 +86,29 @@ export default function OSVisualizer() {
             </h2>
           </div>
           
-          {/* Global Simulation Controls */}
           <div className="flex items-center gap-2 bg-black/20 p-1.5 rounded-xl border border-white/5">
-            <button className="p-2 hover:bg-white/5 rounded-lg text-slate-400 hover:text-white transition-all">
+            <button 
+              onClick={resetSimulation}
+              className="p-2 hover:bg-white/5 rounded-lg text-slate-400 hover:text-white transition-all"
+            >
               <RotateCcw size={16} />
             </button>
-            <button className="flex items-center gap-2 px-4 py-1.5 bg-primary text-background rounded-lg font-bold text-xs hover:bg-blue-400 transition-all">
-              <Play size={14} fill="currentColor" />
-              RUN SIMULATION
+            
+            {/* The Simulation Control Button */}
+            <button 
+              onClick={togglePlay}
+              className={`flex items-center gap-2 px-4 py-1.5 rounded-lg font-bold text-xs transition-all ${
+                isPlaying 
+                ? 'bg-red-500/20 text-red-500 border border-red-500/50 hover:bg-red-500/30' 
+                : 'bg-primary text-background hover:bg-blue-400'
+              }`}
+            >
+              {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
+              {isPlaying ? 'STOP SIMULATION' : 'RUN SIMULATION'}
             </button>
           </div>
         </header>
 
-        {/* The "Stage" (Bento Grid Area) */}
         <section className="flex-1 p-8 overflow-y-auto">
           <div className="grid grid-cols-12 grid-rows-6 gap-6 h-full min-h-[600px]">
             
@@ -100,9 +121,10 @@ export default function OSVisualizer() {
                </h3>
                
                <div className="flex flex-col items-center justify-center h-full border border-dashed border-white/10 rounded-xl">
-                  <p className="text-slate-600 text-sm italic">
-                    {activeTab === 'cpu' ? 'Ready to load CPU Scheduling Engine...' : 'Waiting for module selection...'}
-                  </p>
+                  <div className="text-center">
+                    <p className="text-primary text-4xl font-bold mb-2">{tick}</p>
+                    <p className="text-slate-600 text-sm italic uppercase tracking-widest">Global Clock Tick</p>
+                  </div>
                </div>
             </div>
 
@@ -111,22 +133,26 @@ export default function OSVisualizer() {
               <h3 className="text-xs font-bold text-slate-500 mb-4">SYSTEM PERFORMANCE</h3>
               <div className="space-y-4">
                 <div className="flex justify-between items-end">
-                  <span className="text-[10px] text-slate-500">CPU LOAD</span>
-                  <span className="text-primary text-xl font-bold">0%</span>
+                  <span className="text-[10px] text-slate-500 uppercase">CPU Utilization</span>
+                  <span className="text-primary text-xl font-bold">{isPlaying ? '98%' : '0%'}</span>
                 </div>
                 <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-primary w-[0%] h-full transition-all duration-500" />
+                  <div 
+                    className="bg-primary h-full transition-all duration-1000" 
+                    style={{ width: isPlaying ? '98%' : '0%' }}
+                  />
                 </div>
               </div>
             </div>
 
             {/* Event Log Card */}
             <div className="col-span-12 lg:col-span-4 row-span-2 bg-surface border border-white/5 rounded-2xl p-6 font-mono">
-              <h3 className="text-xs font-bold text-slate-500 mb-4">KERNEL LOGS</h3>
+              <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase">Kernel Logs</h3>
               <div className="text-[10px] space-y-1 text-slate-400">
-                <p><span className="text-success">[OK]</span> OS Kernel initialized...</p>
-                <p><span className="text-primary">[INFO]</span> Loading {activeTab} module...</p>
-                <p className="animate-pulse">_</p>
+                <p><span className="text-success">[OK]</span> Kernel v2.0 active</p>
+                <p><span className="text-primary">[INFO]</span> Module: {activeTab}</p>
+                <p><span className="text-white/40">[TICK]</span> Current timestamp: {tick}</p>
+                {isPlaying && <p className="text-primary animate-pulse">{">"} Simulation running...</p>}
               </div>
             </div>
 
