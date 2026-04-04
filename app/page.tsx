@@ -6,19 +6,18 @@ import {
 } from 'lucide-react';
 import { useSimulation } from '../store/useSimulation';
 import ProcessCreator from '../components/ProcessCreator';
-import GanttChart from '../components/GanttChart'; // Import your new component
+import GanttChart from '../components/GanttChart';
+import StatsCard from '../components/StatsCard'; // Import your new component
 
 export default function OSVisualizer() {
   const [activeTab, setActiveTab] = useState('cpu');
   const [hasMounted, setHasMounted] = useState(false);
-  const { isPlaying, togglePlay, tick, speed, resetSimulation, processes, history } = useSimulation();
+  const { isPlaying, togglePlay, tick, speed, resetSimulation, processes } = useSimulation();
 
-  // Fix Hydration issues
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
-  // THE KERNEL HEARTBEAT
   useEffect(() => {
     if (!hasMounted) return;
     
@@ -160,13 +159,13 @@ export default function OSVisualizer() {
                       </div>
                   </div>
 
-                  {/* GANTT CHART INTEGRATION */}
                   <GanttChart />
                </div>
             </div>
 
-            {/* SIDE METRICS & LOGS */}
+            {/* SIDE METRICS, ANALYTICS & LOGS */}
             <div className="col-span-12 lg:col-span-4 space-y-6">
+              {/* Real-time Load */}
               <div className="bg-surface border border-white/5 rounded-2xl p-6 shadow-xl">
                 <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase">System Performance</h3>
                 <div className="flex justify-between items-end mb-2">
@@ -179,12 +178,13 @@ export default function OSVisualizer() {
                     style={{ width: isPlaying ? '98%' : '0%' }} 
                   />
                 </div>
-                <p className="text-[9px] text-slate-600 mt-4 leading-relaxed">
-                  Real-time monitoring of the scheduler performance and throughput.
-                </p>
               </div>
 
-              <div className="bg-surface border border-white/5 rounded-2xl p-6 font-mono text-[10px] text-slate-400 h-[420px] flex flex-col shadow-xl">
+              {/* SCHEDULER STATISTICS CARD */}
+              <StatsCard /> 
+
+              {/* Logs */}
+              <div className="bg-surface border border-white/5 rounded-2xl p-6 font-mono text-[10px] text-slate-400 h-[320px] flex flex-col shadow-xl">
                 <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase border-b border-white/5 pb-2">Kernel Logs</h3>
                 <div className="space-y-1.5 overflow-y-auto flex-1 custom-scrollbar">
                   <p className="text-green-500/80"><span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [OK] Kernel v2.0 active</p>
