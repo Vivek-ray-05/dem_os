@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Cpu, Database, Share2, Disc, 
-  Play, Pause, RotateCcw, Activity
+  Play, Pause, RotateCcw, Activity, Settings2
 } from 'lucide-react';
 import { useSimulation } from '../store/useSimulation';
 import ProcessCreator from '../components/ProcessCreator';
@@ -12,7 +12,18 @@ import StatsCard from '../components/StatsCard';
 export default function OSVisualizer() {
   const [activeTab, setActiveTab] = useState('cpu');
   const [hasMounted, setHasMounted] = useState(false);
-  const { isPlaying, togglePlay, tick, speed, resetSimulation, processes } = useSimulation();
+  
+  // Destructuring algorithm and setAlgorithm to ensure reactivity
+  const { 
+    isPlaying, 
+    togglePlay, 
+    tick, 
+    speed, 
+    resetSimulation, 
+    processes, 
+    algorithm, 
+    setAlgorithm 
+  } = useSimulation();
 
   useEffect(() => {
     setHasMounted(true);
@@ -98,14 +109,34 @@ export default function OSVisualizer() {
             
             {/* THE INTERACTIVE STAGE */}
             <div className="col-span-12 lg:col-span-8 space-y-6">
-               <div className="bg-surface border border-white/5 rounded-2xl p-6 relative overflow-hidden">
+                <div className="bg-surface border border-white/5 rounded-2xl p-6 relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-4 opacity-10">
                     <Activity size={100} />
                   </div>
                   
-                  <h3 className="text-xs font-bold text-slate-500 mb-6 flex items-center gap-2 uppercase tracking-tighter">
-                    <LayoutDashboard size={14} /> Execution Stage (Tick: {tick})
-                  </h3>
+                  {/* ALGORITHM SELECTOR FIX */}
+                  <div className="flex justify-between items-center mb-6 relative z-20">
+                    <h3 className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase tracking-tighter">
+                      <LayoutDashboard size={14} /> Execution Stage (Tick: {tick})
+                    </h3>
+                    
+                    <div className="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/5">
+                      <Settings2 size={12} className="mx-2 text-slate-500" />
+                      {(['FCFS', 'SJF'] as const).map((algo) => (
+                        <button
+                          key={algo}
+                          onClick={() => setAlgorithm(algo)}
+                          className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${
+                            algorithm === algo 
+                              ? 'bg-primary text-background shadow-[0_0_10px_rgba(0,180,216,0.5)]' 
+                              : 'text-slate-500 hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          {algo}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                       <ProcessCreator />
@@ -160,10 +191,10 @@ export default function OSVisualizer() {
                   </div>
 
                   <GanttChart />
-               </div>
+                </div>
             </div>
 
-            {/* SIDE METRICS, ANALYTICS & LOGS */}
+            {/* ANALYTICS & LOGS */}
             <div className="col-span-12 lg:col-span-4 space-y-6">
               <div className="bg-surface border border-white/5 rounded-2xl p-6 shadow-xl">
                 <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase">System Performance</h3>
@@ -185,18 +216,15 @@ export default function OSVisualizer() {
                 <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase border-b border-white/5 pb-2">Kernel Logs</h3>
                 <div className="space-y-1.5 overflow-y-auto flex-1 custom-scrollbar">
                   <p className="text-green-500/80"><span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [OK] Kernel v2.0 active</p>
-                  <p className="text-primary/80"><span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [INFO] Module: {activeTab}</p>
+                  <p className="text-primary/80"><span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [INFO] Mode: {activeTab} ({algorithm})</p>
                   
                   {processes.map((p, i) => (
                     <React.Fragment key={`log-group-${p.id}-${i}`}>
-                        {/* Real-time Arrival Log */}
                         {tick >= p.arrivalTime && (
                             <p className="text-white/30 truncate">
                                 <span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [NEW] Process {p.id} arrived at {p.arrivalTime}s
                             </p>
                         )}
-                        
-                        {/* Completion Log */}
                         {p.status === 'completed' && (
                             <p className="text-green-400 font-bold">
                                 <span className="opacity-50 text-white/30">[{new Date().toLocaleTimeString()}]</span> [DONE] {p.id} terminated at {p.finishTime}s

@@ -1,17 +1,21 @@
 import { create } from 'zustand';
-import { Process } from '../.next/types/os'; // Updated path from your previous file structure
+import { Process } from '../.next/types/os'; 
+
+type Algorithm = 'FCFS' | 'SJF';
 
 interface SimulationState {
   isPlaying: boolean;
   tick: number;
   speed: number;
   activeModule: string;
+  algorithm: Algorithm; // New: track current strategy
   processes: Process[]; 
   history: (string | null)[]; 
   
   togglePlay: () => void;
   advanceTick: () => void;
   setSpeed: (newSpeed: number) => void;
+  setAlgorithm: (algo: Algorithm) => void; // New: setter
   setActiveModule: (module: string) => void;
   addProcess: (p: Process) => void; 
   resetSimulation: () => void;
@@ -22,11 +26,13 @@ export const useSimulation = create<SimulationState>((set) => ({
   tick: 0,
   speed: 1,
   activeModule: 'cpu',
+  algorithm: 'FCFS',
   processes: [],
   history: [],
 
   togglePlay: () => set((state) => ({ isPlaying: !state.isPlaying })),
   setSpeed: (newSpeed) => set({ speed: newSpeed }),
+  setAlgorithm: (algo) => set({ algorithm: algo }),
 
   setActiveModule: (module) => set({ 
     activeModule: module, 
@@ -36,18 +42,34 @@ export const useSimulation = create<SimulationState>((set) => ({
     processes: [] 
   }),
 
-  // --- THE SCHEDULER ENGINE ---
   advanceTick: () => set((state) => {
     const currentTick = state.tick;
     
     // 1. Identify "Ready" processes (Arrived and not completed)
-    const readyProcesses = state.processes
-      .filter(p => p.status !== 'completed' && p.arrivalTime <= currentTick)
-      // 2. Sort by arrivalTime (Strict FCFS)
-      .sort((a, b) => a.arrivalTime - b.arrivalTime);
+    const readyProcesses = state.processes.filter(
+      p => p.status !== 'completed' && p.arrivalTime <= currentTick
+    );
 
-    // Pick the one that arrived earliest
-    const processToRunFromReady = readyProcesses[0];
+    let processToRunFromReady: Process | null = null;
+
+    if (readyProcesses.length > 0) {
+      if (state.algorithm === 'FCFS') {
+        // --- FCFS LOGIC ---
+        processToRunFromReady = [...readyProcesses].sort((a, b) => a.arrivalTime - b.arrivalTime)[0];
+      } else {
+        // --- SJF LOGIC (Non-Preemptive) ---
+        // If someone is already running, they keep the CPU until finished
+        const currentlyRunning = readyProcesses.find(p => p.status === 'running');
+        
+        if (currentlyRunning) {
+          processToRunFromReady = currentlyRunning;
+        } else {
+          // Otherwise, pick the shortest burst time
+          processToRunFromReady = [...readyProcesses].sort((a, b) => a.burstTime - b.burstTime)[0];
+        }
+      }
+    }
+
     let runningId: string | null = null;
 
     const updatedProcesses = state.processes.map(p => {
@@ -57,16 +79,14 @@ export const useSimulation = create<SimulationState>((set) => ({
         updatedProcess.status = 'running';
         runningId = updatedProcess.id;
 
-        // Decrement remaining time
         updatedProcess.remainingTime = Math.max(0, updatedProcess.remainingTime - 1);
 
-        // Record finish time if completing
         if (updatedProcess.remainingTime === 0) {
           updatedProcess.status = 'completed';
           updatedProcess.finishTime = currentTick + 1; 
         }
       } else if (updatedProcess.status === 'running') {
-        // If a process was running but is no longer the head of the FCFS queue, set to idle
+        // Set to idle if no longer the chosen process (prevents dual-running bugs)
         updatedProcess.status = 'idle';
       }
 
