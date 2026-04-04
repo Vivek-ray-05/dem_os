@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Process } from '../.next/types/os';
+import { Process } from '../.next/types/os'; // Ensure this points to your actual types file
 
 interface SimulationState {
   // --- CLOCK STATE ---
@@ -10,6 +10,7 @@ interface SimulationState {
   
   // --- PROCESS STATE ---
   processes: Process[]; 
+  history: (string | null)[]; // Tracks process IDs per tick for the Gantt Chart
   
   // --- ACTIONS ---
   togglePlay: () => void;
@@ -27,19 +28,47 @@ export const useSimulation = create<SimulationState>((set) => ({
   speed: 1,
   activeModule: 'cpu',
   processes: [],
+  history: [],
 
   // Clock Actions
   togglePlay: () => set((state) => ({ isPlaying: !state.isPlaying })),
-  
-  //advanceTick: () => set((state) => ({ tick: state.tick + 1 })), old v
-  advanceTick: () => set((state) => {
-  const newTick = state.tick + 1;
-   return { tick: newTick };
-}),
 
   setSpeed: (newSpeed) => set({ speed: newSpeed }),
 
-  setActiveModule: (module) => set({ activeModule: module, tick: 0, isPlaying: false }),
+  setActiveModule: (module) => set({ activeModule: module, tick: 0, isPlaying: false, history: [] }),
+
+  // --- THE SCHEDULER ENGINE ---
+  advanceTick: () => set((state) => {
+    const currentTick = state.tick;
+    const updatedProcesses = state.processes.map(p => ({ ...p }));
+
+    // FCFS Logic: Find the first process that hasn't finished and has already arrived
+    const processToRun = updatedProcesses.find(p => 
+      p.status !== 'completed' && p.arrivalTime <= currentTick
+    );
+
+    let runningId: string | null = null;
+
+    if (processToRun) {
+      // Transition status to running
+      processToRun.status = 'running';
+      runningId = processToRun.id;
+
+      // Decrement burst time
+      processToRun.remainingTime = Math.max(0, processToRun.remainingTime - 1);
+
+      // Check for completion
+      if (processToRun.remainingTime === 0) {
+        processToRun.status = 'completed';
+      }
+    }
+
+    return { 
+      tick: currentTick + 1, 
+      processes: updatedProcesses,
+      history: [...state.history, runningId] // Records the "who ran when" snapshot
+    };
+  }),
 
   // Process Actions
   addProcess: (p) => set((state) => ({ 
@@ -49,6 +78,7 @@ export const useSimulation = create<SimulationState>((set) => ({
   resetSimulation: () => set({ 
     tick: 0, 
     isPlaying: false, 
-    processes: [] 
+    processes: [],
+    history: []
   }),
 }));
