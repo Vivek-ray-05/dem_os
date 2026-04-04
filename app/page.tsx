@@ -7,7 +7,7 @@ import {
 import { useSimulation } from '../store/useSimulation';
 import ProcessCreator from '../components/ProcessCreator';
 import GanttChart from '../components/GanttChart';
-import StatsCard from '../components/StatsCard'; // Import your new component
+import StatsCard from '../components/StatsCard';
 
 export default function OSVisualizer() {
   const [activeTab, setActiveTab] = useState('cpu');
@@ -165,7 +165,6 @@ export default function OSVisualizer() {
 
             {/* SIDE METRICS, ANALYTICS & LOGS */}
             <div className="col-span-12 lg:col-span-4 space-y-6">
-              {/* Real-time Load */}
               <div className="bg-surface border border-white/5 rounded-2xl p-6 shadow-xl">
                 <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase">System Performance</h3>
                 <div className="flex justify-between items-end mb-2">
@@ -180,23 +179,27 @@ export default function OSVisualizer() {
                 </div>
               </div>
 
-              {/* SCHEDULER STATISTICS CARD */}
               <StatsCard /> 
 
-              {/* Logs */}
               <div className="bg-surface border border-white/5 rounded-2xl p-6 font-mono text-[10px] text-slate-400 h-[320px] flex flex-col shadow-xl">
                 <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase border-b border-white/5 pb-2">Kernel Logs</h3>
                 <div className="space-y-1.5 overflow-y-auto flex-1 custom-scrollbar">
                   <p className="text-green-500/80"><span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [OK] Kernel v2.0 active</p>
                   <p className="text-primary/80"><span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [INFO] Module: {activeTab}</p>
+                  
                   {processes.map((p, i) => (
                     <React.Fragment key={`log-group-${p.id}-${i}`}>
-                        <p className="text-white/30 truncate">
-                            <span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [NEW] Process {p.id} initialized
-                        </p>
+                        {/* Real-time Arrival Log */}
+                        {tick >= p.arrivalTime && (
+                            <p className="text-white/30 truncate">
+                                <span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [NEW] Process {p.id} arrived at {p.arrivalTime}s
+                            </p>
+                        )}
+                        
+                        {/* Completion Log */}
                         {p.status === 'completed' && (
                             <p className="text-green-400 font-bold">
-                                <span className="opacity-50 text-white/30">[{new Date().toLocaleTimeString()}]</span> [DONE] {p.id} terminated
+                                <span className="opacity-50 text-white/30">[{new Date().toLocaleTimeString()}]</span> [DONE] {p.id} terminated at {p.finishTime}s
                             </p>
                         )}
                     </React.Fragment>
