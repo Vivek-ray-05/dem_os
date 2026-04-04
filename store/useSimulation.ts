@@ -1,18 +1,14 @@
 import { create } from 'zustand';
-import { Process } from '../.next/types/os'; 
+import { Process } from '../.next/types/os'; // Updated path from your previous file structure
 
 interface SimulationState {
-  // --- CLOCK STATE ---
   isPlaying: boolean;
   tick: number;
   speed: number;
   activeModule: string;
-  
-  // --- PROCESS STATE ---
   processes: Process[]; 
   history: (string | null)[]; 
   
-  // --- ACTIONS ---
   togglePlay: () => void;
   advanceTick: () => void;
   setSpeed: (newSpeed: number) => void;
@@ -22,7 +18,6 @@ interface SimulationState {
 }
 
 export const useSimulation = create<SimulationState>((set) => ({
-  // Initial Values
   isPlaying: false,
   tick: 0,
   speed: 1,
@@ -31,7 +26,6 @@ export const useSimulation = create<SimulationState>((set) => ({
   history: [],
 
   togglePlay: () => set((state) => ({ isPlaying: !state.isPlaying })),
-
   setSpeed: (newSpeed) => set({ speed: newSpeed }),
 
   setActiveModule: (module) => set({ 
@@ -45,29 +39,39 @@ export const useSimulation = create<SimulationState>((set) => ({
   // --- THE SCHEDULER ENGINE ---
   advanceTick: () => set((state) => {
     const currentTick = state.tick;
-    const updatedProcesses = state.processes.map(p => ({ ...p }));
+    
+    // 1. Identify "Ready" processes (Arrived and not completed)
+    const readyProcesses = state.processes
+      .filter(p => p.status !== 'completed' && p.arrivalTime <= currentTick)
+      // 2. Sort by arrivalTime (Strict FCFS)
+      .sort((a, b) => a.arrivalTime - b.arrivalTime);
 
-    // FCFS: Find the first arrived process that isn't done
-    const processToRun = updatedProcesses.find(p => 
-      p.status !== 'completed' && p.arrivalTime <= currentTick
-    );
-
+    // Pick the one that arrived earliest
+    const processToRunFromReady = readyProcesses[0];
     let runningId: string | null = null;
 
-    if (processToRun) {
-      processToRun.status = 'running';
-      runningId = processToRun.id;
+    const updatedProcesses = state.processes.map(p => {
+      const updatedProcess = { ...p };
 
-      // Decrement the remaining time
-      processToRun.remainingTime = Math.max(0, processToRun.remainingTime - 1);
+      if (processToRunFromReady && p.id === processToRunFromReady.id) {
+        updatedProcess.status = 'running';
+        runningId = updatedProcess.id;
 
-      // Check if it just finished
-      if (processToRun.remainingTime === 0) {
-        processToRun.status = 'completed';
-        // NEW: Record finish time for stats
-        processToRun.finishTime = currentTick + 1; 
+        // Decrement remaining time
+        updatedProcess.remainingTime = Math.max(0, updatedProcess.remainingTime - 1);
+
+        // Record finish time if completing
+        if (updatedProcess.remainingTime === 0) {
+          updatedProcess.status = 'completed';
+          updatedProcess.finishTime = currentTick + 1; 
+        }
+      } else if (updatedProcess.status === 'running') {
+        // If a process was running but is no longer the head of the FCFS queue, set to idle
+        updatedProcess.status = 'idle';
       }
-    }
+
+      return updatedProcess;
+    });
 
     return { 
       tick: currentTick + 1, 
