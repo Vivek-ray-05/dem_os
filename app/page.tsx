@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Cpu, Database, Share2, Disc, 
-  Play, Pause, RotateCcw, Activity, Settings2, List
+  Play, Pause, RotateCcw, Activity, Settings2, List, Hash
 } from 'lucide-react';
 import { useSimulation } from '../store/useSimulation';
 import ProcessCreator from '../components/ProcessCreator';
@@ -22,7 +22,7 @@ export default function OSVisualizer() {
     processes, 
     algorithm, 
     setAlgorithm,
-    readyQueue // Added to visualize the RR order
+    readyQueue 
   } = useSimulation();
 
   useEffect(() => {
@@ -128,10 +128,10 @@ export default function OSVisualizer() {
                       <LayoutDashboard size={14} /> Execution Stage (Tick: {tick})
                     </h3>
                     
-                    {/* ALGORITHM SELECTOR - UPDATED TO INCLUDE RR */}
+                    {/* UPDATED ALGORITHM SELECTOR: Added 'Priority' */}
                     <div className="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/5">
                       <Settings2 size={12} className="mx-2 text-slate-500" />
-                      {(['FCFS', 'SJF', 'SRTF', 'RR'] as const).map((algo) => (
+                      {(['FCFS', 'SJF', 'SRTF', 'RR', 'Priority'] as const).map((algo) => (
                         <button
                           key={algo}
                           onClick={() => setAlgorithm(algo)}
@@ -145,7 +145,7 @@ export default function OSVisualizer() {
                               : 'text-slate-400 hover:text-white hover:bg-white/5'
                           }`}
                         >
-                          {algo === 'SRTF' ? 'SJF (P)' : algo}
+                          {algo === 'SRTF' ? 'SJF (P)' : algo === 'Priority' ? 'PRIO' : algo}
                         </button>
                       ))}
                     </div>
@@ -206,6 +206,15 @@ export default function OSVisualizer() {
                                   {p.status}
                                 </span>
                               </div>
+
+                              {/* NEW: Priority Badge in the Process List */}
+                              <div className="flex flex-col items-center px-4 border-x border-white/5">
+                                <span className="text-[10px] font-bold text-primary flex items-center gap-1">
+                                   <Hash size={10} /> {p.priority}
+                                </span>
+                                <span className="text-[7px] text-white/20 uppercase font-bold">Priority</span>
+                              </div>
+
                               <div className="text-right">
                                 <span className={`block text-xs font-mono font-bold ${p.status === 'running' ? 'text-primary' : 'text-slate-400'}`}>
                                   {p.remainingTime}s
@@ -255,7 +264,7 @@ export default function OSVisualizer() {
                     <React.Fragment key={`log-${p.id}-${i}`}>
                         {tick >= p.arrivalTime && (
                             <p className="text-white/30 truncate">
-                                <span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [NEW] {p.id} arrived
+                                <span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [NEW] {p.id} arrived (Prio: {p.priority})
                             </p>
                         )}
                         {p.status === 'completed' && (
