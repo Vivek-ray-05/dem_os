@@ -4,10 +4,11 @@ import { Plus } from 'lucide-react';
 import { useSimulation } from '../store/useSimulation';
 
 export default function ProcessCreator() {
-  // 1. Added algorithm, quantum, and setQuantum to the destructuring
   const { addProcess, processes, algorithm, quantum, setQuantum } = useSimulation();
   const [burst, setBurst] = useState(5);
   const [arrival, setArrival] = useState(0);
+  // 1. Added priority state (defaulting to 1)
+  const [priority, setPriority] = useState(1);
 
   const handleAdd = () => {
     const newProcess = {
@@ -15,6 +16,8 @@ export default function ProcessCreator() {
       arrivalTime: arrival,
       burstTime: burst,
       remainingTime: burst,
+      // 2. Included priority in the process object
+      priority: priority,
       status: 'idle' as const,
       color: `hsl(${Math.random() * 360}, 70%, 50%)`,
     };
@@ -48,7 +51,24 @@ export default function ProcessCreator() {
         </div>
       </div>
 
-      {/* 2. Added the Conditional Quantum Input for Round Robin */}
+      {/* 3. Added Priority Input (Shows for Priority Algorithm) */}
+      {algorithm === 'Priority' && (
+        <div className="flex flex-col gap-1 p-3 bg-white/5 rounded border border-white/10 animate-in fade-in slide-in-from-top-2">
+          <label className="text-[9px] text-white/40 uppercase">Process Priority</label>
+          <input 
+            type="number" 
+            placeholder="Priority (Lower = Higher)" 
+            value={priority}
+            onChange={(e) => setPriority(Number(e.target.value))}
+            className="bg-black/40 border border-white/10 rounded p-2 text-xs focus:border-primary outline-none transition-colors"
+          />
+          <p className="text-[8px] text-white/30 mt-1 italic">
+            Lower numbers represent higher scheduling priority
+          </p>
+        </div>
+      )}
+
+      {/* Conditional Quantum Input for Round Robin */}
       {algorithm === 'RR' && (
         <div className="p-3 bg-primary/10 rounded border border-primary/20 animate-in fade-in slide-in-from-top-2">
           <label className="text-[9px] uppercase tracking-widest text-primary font-bold block mb-2">

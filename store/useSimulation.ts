@@ -1,17 +1,19 @@
 import { create } from 'zustand';
 
-// Assuming Process is defined based on your usage in the components
 export interface Process {
   id: string;
   arrivalTime: number;
   burstTime: number;
   remainingTime: number;
+  // Added priority field for Priority Scheduling
+  priority: number; 
   status: 'idle' | 'running' | 'completed';
   finishTime?: number;
   color?: string;
 }
 
-type Algorithm = 'FCFS' | 'SJF' | 'SRTF' | 'RR';
+// Added 'Priority' to the supported algorithms
+type Algorithm = 'FCFS' | 'SJF' | 'SRTF' | 'RR' | 'Priority';
 
 interface SimulationState {
   isPlaying: boolean;
@@ -79,7 +81,6 @@ export const useSimulation = create<SimulationState>((set, get) => ({
     const currentTick = state.tick;
     const { algorithm, quantum, elapsedInQuantum, readyQueue } = state;
 
-    // 1. ARRIVAL: Identify processes arriving at this exact clock tick
     const newlyArrived = state.processes
       .filter(p => p.arrivalTime === currentTick)
       .map(p => p.id);
@@ -97,39 +98,33 @@ export const useSimulation = create<SimulationState>((set, get) => ({
         const isQuantumOver = nextElapsed >= quantum;
 
         if (isFinished) {
-          // Process ended naturally last tick
           processToRunId = null;
           nextElapsed = 0;
           updatedReadyQueue.push(...newlyArrived);
         } 
         else if (isQuantumOver) {
-          // PREEMPTION: New arrivals join queue first, then the preempted process
           updatedReadyQueue.push(...newlyArrived);
           updatedReadyQueue.push(currentlyRunning.id);
           processToRunId = null;
           nextElapsed = 0;
         } 
         else {
-          // Continue current burst; arrivals wait behind
           processToRunId = currentlyRunning.id;
           updatedReadyQueue.push(...newlyArrived);
         }
       } else {
-        // CPU was idle
         updatedReadyQueue.push(...newlyArrived);
       }
 
-      // If CPU is free, pick next from the head of the queue
       if (!processToRunId && updatedReadyQueue.length > 0) {
         processToRunId = updatedReadyQueue.shift() || null;
         nextElapsed = 0; 
       }
 
-      // This tick will count as 1 unit of execution for whichever process is picked
       if (processToRunId) nextElapsed++;
 
     } 
-    // --- NON-RR LOGIC (FCFS, SJF, SRTF) ---
+    // --- NON-RR LOGIC (FCFS, SJF, SRTF, PRIORITY) ---
     else {
       updatedReadyQueue.push(...newlyArrived);
       const eligibleProcesses = state.processes.filter(
@@ -151,10 +146,18 @@ export const useSimulation = create<SimulationState>((set, get) => ({
             return a.arrivalTime - b.arrivalTime;
           })[0].id;
         }
+        // --- NEW: PREEMPTIVE PRIORITY LOGIC ---
+        else if (algorithm === 'Priority') {
+          processToRunId = [...eligibleProcesses].sort((a, b) => {
+            // Primary sort: Priority (Lower number = Higher priority)
+            if (a.priority !== b.priority) return a.priority - b.priority;
+            // Tie-breaker: Earlier arrival time
+            return a.arrivalTime - b.arrivalTime;
+          })[0].id;
+        }
       }
     }
 
-    // 2. APPLY UPDATES: Burn 1ms of burst time and update status
     const updatedProcesses = state.processes.map(p => {
       const updated = { ...p };
       if (p.id === processToRunId) {
@@ -180,6 +183,7 @@ export const useSimulation = create<SimulationState>((set, get) => ({
   }),
 
   addProcess: (p) => set((state) => ({
+    // Ensure priority is handled when adding a new process
     processes: [...state.processes, { ...p, remainingTime: p.burstTime, status: 'idle' }]
   })),
 
