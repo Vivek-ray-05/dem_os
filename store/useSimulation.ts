@@ -1,21 +1,21 @@
 import { create } from 'zustand';
 import { Process } from '../.next/types/os'; 
 
-type Algorithm = 'FCFS' | 'SJF';
+type Algorithm = 'FCFS' | 'SJF' | 'SRTF'; 
 
 interface SimulationState {
   isPlaying: boolean;
   tick: number;
   speed: number;
   activeModule: string;
-  algorithm: Algorithm; // New: track current strategy
+  algorithm: Algorithm;
   processes: Process[]; 
   history: (string | null)[]; 
   
   togglePlay: () => void;
   advanceTick: () => void;
   setSpeed: (newSpeed: number) => void;
-  setAlgorithm: (algo: Algorithm) => void; // New: setter
+  setAlgorithm: (algo: Algorithm) => void;
   setActiveModule: (module: string) => void;
   addProcess: (p: Process) => void; 
   resetSimulation: () => void;
@@ -31,7 +31,9 @@ export const useSimulation = create<SimulationState>((set) => ({
   history: [],
 
   togglePlay: () => set((state) => ({ isPlaying: !state.isPlaying })),
+  
   setSpeed: (newSpeed) => set({ speed: newSpeed }),
+  
   setAlgorithm: (algo) => set({ algorithm: algo }),
 
   setActiveModule: (module) => set({ 
@@ -45,52 +47,51 @@ export const useSimulation = create<SimulationState>((set) => ({
   advanceTick: () => set((state) => {
     const currentTick = state.tick;
     
-    // 1. Identify "Ready" processes (Arrived and not completed)
+    // 1. Identify processes that have arrived and aren't finished
     const readyProcesses = state.processes.filter(
       p => p.status !== 'completed' && p.arrivalTime <= currentTick
     );
 
-    let processToRunFromReady: Process | null = null;
+    let processToRun: Process | null = null;
+    const currentlyRunning = readyProcesses.find(p => p.status === 'running');
 
+    // 2. Scheduler Selection Logic
     if (readyProcesses.length > 0) {
       if (state.algorithm === 'FCFS') {
-        // --- FCFS LOGIC ---
-        processToRunFromReady = [...readyProcesses].sort((a, b) => a.arrivalTime - b.arrivalTime)[0];
-      } else {
-        // --- SJF LOGIC (Non-Preemptive) ---
-        // If someone is already running, they keep the CPU until finished
-        const currentlyRunning = readyProcesses.find(p => p.status === 'running');
-        
-        if (currentlyRunning) {
-          processToRunFromReady = currentlyRunning;
-        } else {
-          // Otherwise, pick the shortest burst time
-          processToRunFromReady = [...readyProcesses].sort((a, b) => a.burstTime - b.burstTime)[0];
-        }
+        // Non-preemptive: Keep current process if it exists
+        processToRun = currentlyRunning || [...readyProcesses].sort((a, b) => a.arrivalTime - b.arrivalTime)[0];
+      } 
+      else if (state.algorithm === 'SJF') {
+        // Non-preemptive: Keep current process until finished
+        processToRun = currentlyRunning || [...readyProcesses].sort((a, b) => a.burstTime - b.burstTime)[0];
+      } 
+      else if (state.algorithm === 'SRTF') {
+        // Preemptive: Always pick the shortest remaining time
+        processToRun = [...readyProcesses].sort((a, b) => {
+          if (a.remainingTime !== b.remainingTime) return a.remainingTime - b.remainingTime;
+          return a.arrivalTime - b.arrivalTime; // Tie-breaker: earlier arrival
+        })[0];
       }
     }
 
+    // 3. Update Process States and Timers
     let runningId: string | null = null;
-
     const updatedProcesses = state.processes.map(p => {
-      const updatedProcess = { ...p };
-
-      if (processToRunFromReady && p.id === processToRunFromReady.id) {
-        updatedProcess.status = 'running';
-        runningId = updatedProcess.id;
-
-        updatedProcess.remainingTime = Math.max(0, updatedProcess.remainingTime - 1);
-
-        if (updatedProcess.remainingTime === 0) {
-          updatedProcess.status = 'completed';
-          updatedProcess.finishTime = currentTick + 1; 
+      const updated = { ...p };
+      
+      if (processToRun && p.id === processToRun.id) {
+        updated.status = 'running';
+        runningId = updated.id;
+        updated.remainingTime = Math.max(0, updated.remainingTime - 1);
+        
+        if (updated.remainingTime === 0) {
+          updated.status = 'completed';
+          updated.finishTime = currentTick + 1;
         }
-      } else if (updatedProcess.status === 'running') {
-        // Set to idle if no longer the chosen process (prevents dual-running bugs)
-        updatedProcess.status = 'idle';
+      } else if (updated.status !== 'completed') {
+        updated.status = 'idle';
       }
-
-      return updatedProcess;
+      return updated;
     });
 
     return { 
@@ -104,10 +105,11 @@ export const useSimulation = create<SimulationState>((set) => ({
     processes: [...state.processes, p] 
   })),
   
-  resetSimulation: () => set({ 
-    tick: 0, 
-    isPlaying: false, 
-    processes: [],
+  // Hard Reset: Clears the entire ready queue
+  resetSimulation: () => set({
+    tick: 0,
+    isPlaying: false,
+    processes: [], 
     history: []
-  }),
+  })
 }));
