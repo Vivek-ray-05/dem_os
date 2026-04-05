@@ -27,16 +27,22 @@ export default function StatsCard() {
       <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase">Scheduler Analytics</h3>
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-black/20 p-4 rounded-xl border border-white/5">
-          <p className="text-[10px] text-slate-500 uppercase">Avg. Waiting ($W_t$)</p>
+          {/* Fixed: Replaced $W_t$ with sub tag */}
+          <p className="text-[10px] text-slate-500 uppercase font-bold">
+            Avg. Waiting (W<sub className="text-[8px] ml-0.5">t</sub>)
+          </p>
           <p className="text-xl font-bold text-primary">{avgWaiting}s</p>
         </div>
         <div className="bg-black/20 p-4 rounded-xl border border-white/5">
-          <p className="text-[10px] text-slate-500 uppercase">Avg. Turnaround ($TAT$)</p>
+          {/* Fixed: Removed $ markers around TAT */}
+          <p className="text-[10px] text-slate-500 uppercase font-bold">
+            Avg. Turnaround (TAT)
+          </p>
           <p className="text-xl font-bold text-green-400">{avgTurnaround}s</p>
         </div>
       </div>
       <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center">
-        <p className="text-[10px] text-slate-500 uppercase">Throughput</p>
+        <p className="text-[10px] text-slate-500 uppercase font-bold">Throughput</p>
         <p className="text-sm font-bold text-white">{completed.length} Jobs Completed</p>
       </div>
     </div>
