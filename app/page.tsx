@@ -13,7 +13,6 @@ export default function OSVisualizer() {
   const [activeTab, setActiveTab] = useState('cpu');
   const [hasMounted, setHasMounted] = useState(false);
   
-  // Destructuring algorithm and setAlgorithm to ensure reactivity
   const { 
     isPlaying, 
     togglePlay, 
@@ -66,7 +65,9 @@ export default function OSVisualizer() {
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                activeTab === item.id ? 'bg-primary/10 text-primary border border-primary/20' : 'text-slate-400 hover:bg-white/5'
+                activeTab === item.id 
+                  ? 'bg-primary/10 text-primary border border-primary/20' 
+                  : 'text-slate-400 hover:bg-white/5'
               }`}
             >
               {item.icon}
@@ -92,10 +93,18 @@ export default function OSVisualizer() {
             >
               <RotateCcw size={16} />
             </button>
+
+            {/* RUN/STOP BUTTON WITH FORCED CONTRAST */}
             <button 
               onClick={togglePlay} 
+              style={{
+                backgroundColor: isPlaying ? '' : '#00b4d8',
+                color: isPlaying ? '' : '#000000',
+              }}
               className={`flex items-center gap-2 px-6 py-1.5 rounded-lg font-bold text-xs transition-all ${
-                isPlaying ? 'bg-red-500/20 text-red-500 border border-red-500/30' : 'bg-primary text-background'
+                isPlaying 
+                  ? 'bg-red-500/20 text-red-500 border border-red-500/30' 
+                  : 'hover:brightness-110 shadow-[0_0_15px_rgba(0,180,216,0.3)]'
               }`}
             >
               {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" />}
@@ -104,35 +113,39 @@ export default function OSVisualizer() {
           </div>
         </header>
 
-        <section className="flex-1 p-8 overflow-y-auto">
+        <section className="flex-1 p-8 overflow-y-auto custom-scrollbar">
           <div className="grid grid-cols-12 gap-6 max-w-7xl mx-auto">
             
             {/* THE INTERACTIVE STAGE */}
             <div className="col-span-12 lg:col-span-8 space-y-6">
-                <div className="bg-surface border border-white/5 rounded-2xl p-6 relative overflow-hidden">
+                <div className="bg-surface border border-white/5 rounded-2xl p-6 relative overflow-hidden shadow-2xl">
                   <div className="absolute top-0 right-0 p-4 opacity-10">
                     <Activity size={100} />
                   </div>
                   
-                  {/* ALGORITHM SELECTOR FIX */}
                   <div className="flex justify-between items-center mb-6 relative z-20">
                     <h3 className="text-xs font-bold text-slate-500 flex items-center gap-2 uppercase tracking-tighter">
                       <LayoutDashboard size={14} /> Execution Stage (Tick: {tick})
                     </h3>
                     
+                    {/* ALGORITHM SELECTOR - FORCED CONTRAST */}
                     <div className="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/5">
                       <Settings2 size={12} className="mx-2 text-slate-500" />
-                      {(['FCFS', 'SJF'] as const).map((algo) => (
+                      {(['FCFS', 'SJF', 'SRTF'] as const).map((algo) => (
                         <button
                           key={algo}
                           onClick={() => setAlgorithm(algo)}
-                          className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${
+                          style={{
+                            backgroundColor: algorithm === algo ? '#00b4d8' : 'transparent',
+                            color: algorithm === algo ? '#000000' : '',
+                          }}
+                          className={`px-3 py-1 rounded-md text-[10px] font-black transition-all ${
                             algorithm === algo 
-                              ? 'bg-primary text-background shadow-[0_0_10px_rgba(0,180,216,0.5)]' 
-                              : 'text-slate-500 hover:text-white hover:bg-white/5'
+                              ? 'shadow-[0_0_20px_rgba(0,180,216,0.5)] scale-105' 
+                              : 'text-slate-400 hover:text-white hover:bg-white/5'
                           }`}
                         >
-                          {algo}
+                          {algo === 'SRTF' ? 'SJF (P)' : algo}
                         </button>
                       ))}
                     </div>
@@ -152,12 +165,12 @@ export default function OSVisualizer() {
                               key={p.id} 
                               className={`flex justify-between items-center p-3 rounded-lg border-l-4 transition-all duration-500 ${
                                 p.status === 'running' 
-                                  ? 'bg-primary/20 scale-[1.02] border-primary shadow-[0_0_20px_rgba(0,180,216,0.15)]' 
+                                  ? 'bg-primary/10 border-primary shadow-[0_0_20px_rgba(0,180,216,0.1)] scale-[1.02]' 
                                   : p.status === 'completed' 
                                   ? 'opacity-30 grayscale bg-white/5 border-white/5' 
                                   : 'bg-white/5 border-white/10'
                               }`}
-                              style={{ borderColor: p.status === 'running' ? undefined : p.color }}
+                              style={{ borderLeftColor: p.status === 'running' ? '#00b4d8' : p.color }}
                             >
                               <div className="flex flex-col">
                                 <span className="text-sm font-bold flex items-center gap-2">
@@ -174,7 +187,7 @@ export default function OSVisualizer() {
                                 </span>
                               </div>
                               <div className="text-right">
-                                <span className={`block text-xs font-mono font-bold ${p.status === 'running' ? 'text-primary animate-pulse' : 'text-slate-400'}`}>
+                                <span className={`block text-xs font-mono font-bold ${p.status === 'running' ? 'text-primary' : 'text-slate-400'}`}>
                                   {p.remainingTime}s
                                 </span>
                                 <span className="block text-[8px] text-slate-600 uppercase font-bold">Remaining</span>
@@ -182,7 +195,7 @@ export default function OSVisualizer() {
                             </div>
                           ))}
                           {processes.length === 0 && (
-                            <div className="h-40 flex flex-col items-center justify-center border border-dashed border-white/5 rounded-lg">
+                            <div className="h-40 flex flex-col items-center justify-center border border-dashed border-white/10 rounded-lg">
                                 <p className="text-slate-600 text-xs italic">Waiting for processes...</p>
                             </div>
                           )}
@@ -199,12 +212,12 @@ export default function OSVisualizer() {
               <div className="bg-surface border border-white/5 rounded-2xl p-6 shadow-xl">
                 <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase">System Performance</h3>
                 <div className="flex justify-between items-end mb-2">
-                  <span className="text-[10px] text-slate-500">CPU UTILIZATION</span>
+                  <span className="text-[10px] text-slate-500 uppercase font-bold">CPU UTILIZATION</span>
                   <span className="text-primary text-xl font-bold">{isPlaying ? '98.2%' : '0.0%'}</span>
                 </div>
                 <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
                   <div 
-                    className="bg-primary h-full transition-all duration-700 ease-in-out shadow-[0_0_10px_#00b4d8]" 
+                    className="bg-primary h-full transition-all duration-700 shadow-[0_0_10px_#00b4d8]" 
                     style={{ width: isPlaying ? '98%' : '0%' }} 
                   />
                 </div>
@@ -214,20 +227,20 @@ export default function OSVisualizer() {
 
               <div className="bg-surface border border-white/5 rounded-2xl p-6 font-mono text-[10px] text-slate-400 h-[320px] flex flex-col shadow-xl">
                 <h3 className="text-xs font-bold text-slate-500 mb-4 uppercase border-b border-white/5 pb-2">Kernel Logs</h3>
-                <div className="space-y-1.5 overflow-y-auto flex-1 custom-scrollbar">
+                <div className="space-y-1.5 overflow-y-auto flex-1 custom-scrollbar pr-2">
                   <p className="text-green-500/80"><span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [OK] Kernel v2.0 active</p>
-                  <p className="text-primary/80"><span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [INFO] Mode: {activeTab} ({algorithm})</p>
+                  <p className="text-primary/80"><span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [INFO] Mode: {algorithm}</p>
                   
                   {processes.map((p, i) => (
-                    <React.Fragment key={`log-group-${p.id}-${i}`}>
+                    <React.Fragment key={`log-${p.id}-${i}`}>
                         {tick >= p.arrivalTime && (
                             <p className="text-white/30 truncate">
-                                <span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [NEW] Process {p.id} arrived at {p.arrivalTime}s
+                                <span className="opacity-50">[{new Date().toLocaleTimeString()}]</span> [NEW] {p.id} arrived
                             </p>
                         )}
                         {p.status === 'completed' && (
                             <p className="text-green-400 font-bold">
-                                <span className="opacity-50 text-white/30">[{new Date().toLocaleTimeString()}]</span> [DONE] {p.id} terminated at {p.finishTime}s
+                                <span className="opacity-50 text-white/30">[{new Date().toLocaleTimeString()}]</span> [DONE] {p.id} terminated
                             </p>
                         )}
                     </React.Fragment>
