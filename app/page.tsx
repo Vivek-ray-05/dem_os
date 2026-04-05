@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Cpu, Database, Share2, Disc, 
-  Play, Pause, RotateCcw, Activity, Settings2
+  Play, Pause, RotateCcw, Activity, Settings2, List
 } from 'lucide-react';
 import { useSimulation } from '../store/useSimulation';
 import ProcessCreator from '../components/ProcessCreator';
@@ -21,7 +21,8 @@ export default function OSVisualizer() {
     resetSimulation, 
     processes, 
     algorithm, 
-    setAlgorithm 
+    setAlgorithm,
+    readyQueue // Added to visualize the RR order
   } = useSimulation();
 
   useEffect(() => {
@@ -94,7 +95,6 @@ export default function OSVisualizer() {
               <RotateCcw size={16} />
             </button>
 
-            {/* RUN/STOP BUTTON WITH FORCED CONTRAST */}
             <button 
               onClick={togglePlay} 
               style={{
@@ -128,10 +128,10 @@ export default function OSVisualizer() {
                       <LayoutDashboard size={14} /> Execution Stage (Tick: {tick})
                     </h3>
                     
-                    {/* ALGORITHM SELECTOR - FORCED CONTRAST */}
+                    {/* ALGORITHM SELECTOR - UPDATED TO INCLUDE RR */}
                     <div className="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/5">
                       <Settings2 size={12} className="mx-2 text-slate-500" />
-                      {(['FCFS', 'SJF', 'SRTF'] as const).map((algo) => (
+                      {(['FCFS', 'SJF', 'SRTF', 'RR'] as const).map((algo) => (
                         <button
                           key={algo}
                           onClick={() => setAlgorithm(algo)}
@@ -150,13 +150,33 @@ export default function OSVisualizer() {
                       ))}
                     </div>
                   </div>
+
+                  {/* RR READY QUEUE VISUALIZER */}
+                  {algorithm === 'RR' && readyQueue.length > 0 && (
+                    <div className="mb-6 p-3 bg-black/40 rounded-xl border border-white/5 flex items-center gap-3 overflow-x-auto scrollbar-hide animate-in fade-in zoom-in-95">
+                      <div className="flex items-center gap-2 px-2 border-r border-white/10 mr-2">
+                        <List size={12} className="text-primary" />
+                        <span className="text-[9px] font-bold text-primary uppercase">Queue</span>
+                      </div>
+                      <div className="flex gap-2">
+                        {readyQueue.map((id, index) => {
+                          const p = processes.find(proc => proc.id === id);
+                          return (
+                            <div key={`${id}-${index}`} className="px-3 py-1 bg-white/5 border border-white/10 rounded-md text-[10px] whitespace-nowrap">
+                              {p?.id}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                       <ProcessCreator />
 
                       <div className="bg-black/20 border border-white/5 rounded-xl p-4 min-h-[300px]">
                         <h4 className="text-[10px] uppercase text-slate-500 font-bold mb-4 flex justify-between">
-                            Ready Queue 
+                            Process State List 
                             <span className="text-primary">{processes.filter(p => p.status !== 'completed').length} Active</span>
                         </h4>
                         <div className="space-y-2">
