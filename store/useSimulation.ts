@@ -1,198 +1,207 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
 export interface Process {
   id: string;
   arrivalTime: number;
   burstTime: number;
   remainingTime: number;
-  // Added priority field for Priority Scheduling
-  priority: number; 
-  status: 'idle' | 'running' | 'completed';
+  priority: number;
+  status: "idle" | "running" | "completed";
   finishTime?: number;
-  color?: string;
+  color: string;
 }
 
-// Added 'Priority' to the supported algorithms
-type Algorithm = 'FCFS' | 'SJF' | 'SRTF' | 'RR' | 'Priority';
+export interface LogEntry {
+  time: number;
+  text: string;
+  kind: "ok" | "info" | "new" | "done" | "warn";
+}
+
+type Algorithm = "FCFS" | "SJF" | "SRTF" | "RR" | "Priority";
 
 interface SimulationState {
   isPlaying: boolean;
   tick: number;
   speed: number;
-  activeModule: string;
   algorithm: Algorithm;
   processes: Process[];
   history: (string | null)[];
   quantum: number;
   readyQueue: string[];
   elapsedInQuantum: number;
-
-  setQuantum: (q: number) => void;
+  logs: LogEntry[];
   togglePlay: () => void;
   advanceTick: () => void;
-  setSpeed: (newSpeed: number) => void;
+  setSpeed: (s: number) => void;
   setAlgorithm: (algo: Algorithm) => void;
-  setActiveModule: (module: string) => void;
-  addProcess: (p: Process) => void;
+  setQuantum: (q: number) => void;
+  addProcess: (p: Omit<Process, "remainingTime" | "status">) => void;
+  removeProcess: (id: string) => void;
   resetSimulation: () => void;
 }
+
+const PROCESS_COLORS = [
+  "#00b4d8","#4caf7d","#f59e0b","#a78bfa",
+  "#f472b6","#34d399","#fb923c","#60a5fa",
+];
 
 export const useSimulation = create<SimulationState>((set, get) => ({
   isPlaying: false,
   tick: 0,
   speed: 1,
-  activeModule: 'cpu',
-  algorithm: 'FCFS',
+  algorithm: "FCFS",
   processes: [],
   history: [],
   quantum: 2,
   readyQueue: [],
   elapsedInQuantum: 0,
+  logs: [{ time: 0, text: "Kernel v2.0 active", kind: "ok" }],
 
-  setQuantum: (q) => set({ quantum: q }),
-  togglePlay: () => set((state) => ({ isPlaying: !state.isPlaying })),
-  setSpeed: (newSpeed) => set({ speed: newSpeed }),
+  togglePlay: () => set((s) => ({ isPlaying: !s.isPlaying })),
+  setSpeed: (speed) => set({ speed }),
+  setQuantum: (quantum) => set({ quantum }),
 
-  setAlgorithm: (algo) => set({
-    algorithm: algo,
-    tick: 0,
-    history: [],
-    readyQueue: [],
-    elapsedInQuantum: 0,
-    processes: get().processes.map(p => ({
-      ...p,
-      status: 'idle',
-      remainingTime: p.burstTime,
-      finishTime: undefined
-    }))
-  }),
+  setAlgorithm: (algorithm) =>
+    set((s) => ({
+      algorithm,
+      tick: 0,
+      history: [],
+      readyQueue: [],
+      elapsedInQuantum: 0,
+      logs: [
+        { time: 0, text: "Kernel v2.0 active", kind: "ok" },
+        { time: 0, text: `Algorithm set to ${algorithm}`, kind: "info" },
+      ],
+      processes: s.processes.map((p) => ({
+        ...p,
+        status: "idle" as const,
+        remainingTime: p.burstTime,
+        finishTime: undefined,
+      })),
+    })),
 
-  setActiveModule: (module) => set({
-    activeModule: module,
-    tick: 0,
-    isPlaying: false,
-    history: [],
-    processes: [],
-    readyQueue: [],
-    elapsedInQuantum: 0
-  }),
+  addProcess: (p) =>
+    set((s) => {
+      const colorIndex = s.processes.length % PROCESS_COLORS.length;
+      const newProcess: Process = {
+        ...p,
+        color: PROCESS_COLORS[colorIndex],
+        remainingTime: p.burstTime,
+        status: "idle",
+      };
+      return {
+        processes: [...s.processes, newProcess],
+        logs: [
+          ...s.logs,
+          { time: s.tick, text: `${p.id} queued — burst ${p.burstTime}, arrival ${p.arrivalTime}`, kind: "new" },
+        ],
+      };
+    }),
 
-  advanceTick: () => set((state) => {
-    const currentTick = state.tick;
-    const { algorithm, quantum, elapsedInQuantum, readyQueue } = state;
+  removeProcess: (id) =>
+    set((s) => ({
+      processes: s.processes.filter((p) => p.id !== id),
+      logs: [...s.logs, { time: s.tick, text: `${id} removed from queue`, kind: "warn" }],
+    })),
 
-    const newlyArrived = state.processes
-      .filter(p => p.arrivalTime === currentTick)
-      .map(p => p.id);
+  resetSimulation: () =>
+    set({
+      tick: 0,
+      isPlaying: false,
+      processes: [],
+      history: [],
+      readyQueue: [],
+      elapsedInQuantum: 0,
+      logs: [{ time: 0, text: "Kernel reset — ready", kind: "ok" }],
+    }),
 
-    let updatedReadyQueue = [...readyQueue];
-    let processToRunId: string | null = null;
-    let nextElapsed = elapsedInQuantum;
+  advanceTick: () =>
+    set((state) => {
+      const { tick, algorithm, quantum, elapsedInQuantum, readyQueue } = state;
+      const newlyArrived = state.processes.filter((p) => p.arrivalTime === tick).map((p) => p.id);
+      let updatedQueue = [...readyQueue];
+      let processToRunId: string | null = null;
+      let nextElapsed = elapsedInQuantum;
+      const newLogs: LogEntry[] = [];
 
-    // --- ROUND ROBIN LOGIC ---
-    if (algorithm === 'RR') {
-      const currentlyRunning = state.processes.find(p => p.status === 'running');
+      newlyArrived.forEach((id) => {
+        newLogs.push({ time: tick, text: `${id} arrived`, kind: "new" });
+      });
 
-      if (currentlyRunning) {
-        const isFinished = currentlyRunning.remainingTime <= 0;
-        const isQuantumOver = nextElapsed >= quantum;
-
-        if (isFinished) {
-          processToRunId = null;
-          nextElapsed = 0;
-          updatedReadyQueue.push(...newlyArrived);
-        } 
-        else if (isQuantumOver) {
-          updatedReadyQueue.push(...newlyArrived);
-          updatedReadyQueue.push(currentlyRunning.id);
-          processToRunId = null;
-          nextElapsed = 0;
-        } 
-        else {
-          processToRunId = currentlyRunning.id;
-          updatedReadyQueue.push(...newlyArrived);
+      if (algorithm === "RR") {
+        const running = state.processes.find((p) => p.status === "running");
+        if (running) {
+          if (running.remainingTime <= 0) {
+            nextElapsed = 0;
+            updatedQueue.push(...newlyArrived);
+          } else if (nextElapsed >= quantum) {
+            updatedQueue.push(...newlyArrived, running.id);
+            processToRunId = null;
+            nextElapsed = 0;
+          } else {
+            processToRunId = running.id;
+            updatedQueue.push(...newlyArrived);
+          }
+        } else {
+          updatedQueue.push(...newlyArrived);
         }
+        if (!processToRunId && updatedQueue.length > 0) {
+          processToRunId = updatedQueue.shift() ?? null;
+          nextElapsed = 0;
+        }
+        if (processToRunId) nextElapsed++;
       } else {
-        updatedReadyQueue.push(...newlyArrived);
-      }
-
-      if (!processToRunId && updatedReadyQueue.length > 0) {
-        processToRunId = updatedReadyQueue.shift() || null;
-        nextElapsed = 0; 
-      }
-
-      if (processToRunId) nextElapsed++;
-
-    } 
-    // --- NON-RR LOGIC (FCFS, SJF, SRTF, PRIORITY) ---
-    else {
-      updatedReadyQueue.push(...newlyArrived);
-      const eligibleProcesses = state.processes.filter(
-        p => p.status !== 'completed' && p.arrivalTime <= currentTick
-      );
-
-      if (eligibleProcesses.length > 0) {
-        if (algorithm === 'FCFS') {
-          const currentlyRunning = eligibleProcesses.find(p => p.status === 'running');
-          processToRunId = (currentlyRunning || [...eligibleProcesses].sort((a, b) => a.arrivalTime - b.arrivalTime)[0]).id;
-        } 
-        else if (algorithm === 'SJF') {
-          const currentlyRunning = eligibleProcesses.find(p => p.status === 'running');
-          processToRunId = (currentlyRunning || [...eligibleProcesses].sort((a, b) => a.burstTime - b.burstTime)[0]).id;
-        } 
-        else if (algorithm === 'SRTF') {
-          processToRunId = [...eligibleProcesses].sort((a, b) => {
-            if (a.remainingTime !== b.remainingTime) return a.remainingTime - b.remainingTime;
-            return a.arrivalTime - b.arrivalTime;
-          })[0].id;
-        }
-        // --- NEW: PREEMPTIVE PRIORITY LOGIC ---
-        else if (algorithm === 'Priority') {
-          processToRunId = [...eligibleProcesses].sort((a, b) => {
-            // Primary sort: Priority (Lower number = Higher priority)
-            if (a.priority !== b.priority) return a.priority - b.priority;
-            // Tie-breaker: Earlier arrival time
-            return a.arrivalTime - b.arrivalTime;
-          })[0].id;
+        updatedQueue.push(...newlyArrived);
+        const eligible = state.processes.filter(
+          (p) => p.status !== "completed" && p.arrivalTime <= tick
+        );
+        if (eligible.length > 0) {
+          if (algorithm === "FCFS") {
+            const running = eligible.find((p) => p.status === "running");
+            processToRunId = running?.id ?? [...eligible].sort((a, b) => a.arrivalTime - b.arrivalTime)[0].id;
+          } else if (algorithm === "SJF") {
+            const running = eligible.find((p) => p.status === "running");
+            processToRunId = running?.id ?? [...eligible].sort((a, b) => a.burstTime - b.burstTime)[0].id;
+          } else if (algorithm === "SRTF") {
+            processToRunId = [...eligible].sort((a, b) =>
+              a.remainingTime !== b.remainingTime ? a.remainingTime - b.remainingTime : a.arrivalTime - b.arrivalTime
+            )[0].id;
+          } else if (algorithm === "Priority") {
+            processToRunId = [...eligible].sort((a, b) =>
+              a.priority !== b.priority ? a.priority - b.priority : a.arrivalTime - b.arrivalTime
+            )[0].id;
+          }
         }
       }
-    }
 
-    const updatedProcesses = state.processes.map(p => {
-      const updated = { ...p };
-      if (p.id === processToRunId) {
-        updated.status = 'running';
-        updated.remainingTime = Math.max(0, updated.remainingTime - 1);
-        if (updated.remainingTime === 0) {
-          updated.status = 'completed';
-          updated.finishTime = currentTick + 1;
+      const updatedProcesses = state.processes.map((p) => {
+        const next = { ...p };
+        if (p.id === processToRunId) {
+          next.status = "running";
+          next.remainingTime = Math.max(0, next.remainingTime - 1);
+          if (next.remainingTime === 0) {
+            next.status = "completed";
+            next.finishTime = tick + 1;
+            newLogs.push({ time: tick + 1, text: `${p.id} completed`, kind: "done" });
+          }
+        } else if (next.status !== "completed") {
+          next.status = "idle";
         }
-      } else if (updated.status !== 'completed') {
-        updated.status = 'idle';
-      }
-      return updated;
-    });
+        return next;
+      });
 
-    return {
-      tick: currentTick + 1,
-      processes: updatedProcesses,
-      history: [...state.history, processToRunId],
-      readyQueue: updatedReadyQueue,
-      elapsedInQuantum: nextElapsed
-    };
-  }),
-
-  addProcess: (p) => set((state) => ({
-    // Ensure priority is handled when adding a new process
-    processes: [...state.processes, { ...p, remainingTime: p.burstTime, status: 'idle' }]
-  })),
-
-  resetSimulation: () => set({
-    tick: 0,
-    isPlaying: false,
-    processes: [],
-    history: [],
-    readyQueue: [],
-    elapsedInQuantum: 0
-  })
+      return {
+        tick: tick + 1,
+        processes: updatedProcesses,
+        history: [...state.history, processToRunId],
+        readyQueue: updatedQueue,
+        elapsedInQuantum: nextElapsed,
+        logs: [...state.logs, ...newLogs],
+      };
+    }),
 }));
+
+export function getCpuUtilisation(history: (string | null)[]): number {
+  if (history.length === 0) return 0;
+  return Math.round((history.filter(Boolean).length / history.length) * 100);
+}
